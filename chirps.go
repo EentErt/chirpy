@@ -3,6 +3,7 @@ package main
 import (
 	"chirpy/internal/database"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"slices"
@@ -57,11 +58,29 @@ func createChirp(writer http.ResponseWriter, request *http.Request) {
 func getChirps(writer http.ResponseWriter, request *http.Request) {
 	chirps, err := ApiCfg.Queries.GetChirps(request.Context())
 	if err != nil {
-		respondWithJsonError(writer, "Something went wrong", 500)
+		errString := fmt.Sprint(err)
+		respondWithJsonError(writer, errString, 500)
 		return
 	}
 
 	respondWithJson(writer, 200, makeChirpsSlice(chirps))
+}
+
+func getChirp(writer http.ResponseWriter, request *http.Request) {
+	idString := request.PathValue("chirpID")
+	chirpID, err := uuid.Parse(idString)
+	if err != nil {
+		respondWithJsonError(writer, "Something went wrong", 500)
+		return
+	}
+
+	chirp, err := ApiCfg.Queries.GetChirp(request.Context(), chirpID)
+	if err != nil {
+		respondWithJsonError(writer, "Chirp not found", 404)
+		return
+	}
+
+	respondWithJson(writer, 200, makeChirpMap(chirp))
 }
 
 func censorChirp(body string) string {

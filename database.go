@@ -1,28 +1,33 @@
 package main
 
 import (
+	"chirpy/internal/auth"
+	"chirpy/internal/database"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 )
 
-type email struct {
-	Address string `json:"email"`
-}
-
 func createUser(writer http.ResponseWriter, request *http.Request) {
-	email := email{}
+	defer request.Body.Close()
+	newUser := database.CreateUserParams{}
+
 	body, err := io.ReadAll(request.Body)
 	if err != nil {
 		errorResponse := fmt.Sprint(err)
 		respondWithJsonError(writer, errorResponse, 500)
 	}
-	defer request.Body.Close()
 
-	json.Unmarshal(body, &email)
+	json.Unmarshal(body, &newUser)
 
-	user, err := ApiCfg.Queries.CreateUser(request.Context(), email.Address)
+	hashedPass, err := auth.HashPassword(newUser.HashedPassword)
+	if err != nil {
+		respondWithJsonError(writer, "Something went wrong", 500)
+	}
+	newUser.HashedPassword = hashedPass
+
+	user, err := ApiCfg.Queries.CreateUser(request.Context(), newUser)
 	if err != nil {
 		errorResponse := fmt.Sprint(err)
 		respondWithJsonError(writer, errorResponse, 500)
