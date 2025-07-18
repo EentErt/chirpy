@@ -1,6 +1,7 @@
 package main
 
 import (
+	"chirpy/internal/database"
 	"fmt"
 	"net/http"
 	"sync/atomic"
@@ -8,9 +9,11 @@ import (
 
 type apiConfig struct {
 	fileserverHits atomic.Int32
+	Queries        database.Queries
+	Platform       string
 }
 
-var apiCfg = apiConfig{
+var ApiCfg = apiConfig{
 	fileserverHits: atomic.Int32{},
 }
 
@@ -31,7 +34,15 @@ func (apiCfg *apiConfig) metrics(writer http.ResponseWriter, request *http.Reque
 }
 
 func (apiCfg *apiConfig) reset(writer http.ResponseWriter, request *http.Request) {
+	if apiCfg.Platform != "dev" {
+		respondWithJsonError(writer, "Forbidden", 403)
+	}
+
 	apiCfg.fileserverHits.Store(0)
+	if err := apiCfg.Queries.Reset(request.Context()); err != nil {
+		errorResponse := fmt.Sprint(err)
+		respondWithJsonError(writer, errorResponse, 500)
+	}
 	request.Header.Set("Content-Type", "text/plain; charset=utf-8")
 	writer.WriteHeader(200)
 }
