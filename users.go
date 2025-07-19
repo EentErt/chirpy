@@ -7,11 +7,13 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 )
 
 type userRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	Email      string `json:"email"`
+	Password   string `json:"password"`
+	Expiration int64  `json:"expires_in_seconds"`
 }
 
 func createUser(writer http.ResponseWriter, request *http.Request) {
@@ -47,14 +49,7 @@ func createUser(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	responseBody := map[string]string{
-		"id":         user.ID.String(),
-		"created_at": user.CreatedAt.String(),
-		"updated_at": user.UpdatedAt.String(),
-		"email":      user.Email,
-	}
-
-	respondWithJson(writer, 201, responseBody)
+	respondWithJson(writer, 201, makeUserMap(user))
 }
 
 func login(writer http.ResponseWriter, request *http.Request) {
@@ -71,6 +66,11 @@ func login(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 
+	if userReq.Expiration == 0 || userReq.Expiration > 3600 {
+		userReq.Expiration = 3600
+	}
+	expiration := time.Duration(userReq.Expiration * 1000000000)
+
 	user, err := ApiCfg.Queries.GetUserByEmail(request.Context(), userReq.Email)
 	if err != nil {
 		respondWithJsonError(writer, "Something went wrong", 500)
@@ -83,7 +83,15 @@ func login(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	respondWithJson(writer, 200, makeUserMap(user))
+	userMap := makeUserMap(user)
+	jwtKey, err := auth.MakeJWT(user.ID, ApiCfg.Secret, expiration)
+	if err != nil {
+		respondWithJsonError(writer, "unable to create login key", 500)
+		return
+	}
+	userMap["token"] = jwtKey
+
+	respondWithJson(writer, 200, userMap)
 }
 
 func makeUserMap(user database.User) map[string]string {

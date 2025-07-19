@@ -11,6 +11,7 @@ type apiConfig struct {
 	fileserverHits atomic.Int32
 	Queries        database.Queries
 	Platform       string
+	Secret         string
 }
 
 var ApiCfg = apiConfig{

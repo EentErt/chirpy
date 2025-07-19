@@ -24,6 +24,7 @@ func main() {
 	ApiCfg.Queries = *dbQueries
 
 	ApiCfg.Platform = os.Getenv("PLATFORM")
+	ApiCfg.Secret = os.Getenv("SECRET")
 
 	fmt.Println("hi")
 	ApiCfg.fileserverHits.Store(0)

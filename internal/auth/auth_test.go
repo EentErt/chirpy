@@ -61,25 +61,33 @@ func TestMakeJWT(t *testing.T) {
 
 func testGetBearerToken(t *testing.T) {
 	cases := []struct {
-		input    interface{}
+		input    []string
 		expected string
 	}{
 		{
-			input:    map[string]string{"Authorization": "bearer TOKEN_STRING"},
+			input:    []string{"Authorization", "bearer TOKEN_STRING"},
 			expected: "TOKEN_STRING",
 		},
 		{
-			input:    map[string]string{"Authorization": ""},
+			input:    []string{"Authorization", ""},
 			expected: "",
 		},
 		{
-			input:    map[string]string{"": "bearer TOKEN_STRING"},
+			input:    []string{"", "bearer TOKEN_STRING"},
 			expected: "",
 		},
 	}
 	for _, c := range cases {
 		var header http.Header
-		header = c.input
-		token, err := GetBearerToken()
+		header.Set(c.input[0], c.input[1])
+		token, err := GetBearerToken(header)
+		if err != nil {
+			t.Errorf("unable to retrieve token")
+		}
+
+		if token != c.expected {
+			t.Errorf("token value: \"%s\" does not match expected value: \"%s\"", token, c.expected)
+			continue
+		}
 	}
 }

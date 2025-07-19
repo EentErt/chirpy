@@ -1,6 +1,7 @@
 package main
 
 import (
+	"chirpy/internal/auth"
 	"chirpy/internal/database"
 	"encoding/json"
 	"fmt"
@@ -22,13 +23,13 @@ type chirp struct {
 }
 
 func createChirp(writer http.ResponseWriter, request *http.Request) {
+	defer request.Body.Close()
 	chirp := chirp{}
 	body, err := io.ReadAll(request.Body)
 	if err != nil {
 		respondWithJsonError(writer, "Something went wrong", 500)
 		return
 	}
-	defer request.Body.Close()
 
 	if err := json.Unmarshal(body, &chirp); err != nil {
 		respondWithJsonError(writer, "Something went wrong", 500)
@@ -40,9 +41,21 @@ func createChirp(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 
+	token, err := auth.GetBearerToken(request.Header)
+	if err != nil {
+		respondWithJsonError(writer, "Unauthorized", 401)
+		return
+	}
+
+	id, err := auth.ValidateJWT(token, ApiCfg.Secret)
+	if err != nil {
+		respondWithJsonError(writer, "Unauthorized", 401)
+		return
+	}
+
 	chirpParams := database.CreateChirpParams{
 		Body:   censorChirp(chirp.Body),
-		UserID: chirp.UserID,
+		UserID: id,
 	}
 
 	chirpData, err := ApiCfg.Queries.CreateChirp(request.Context(), chirpParams)
