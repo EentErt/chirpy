@@ -1,6 +1,9 @@
 package auth
 
 import (
+	"fmt"
+	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -27,8 +30,8 @@ func CheckPasswordHash(hashed_password, password string) error {
 func MakeJWT(userID uuid.UUID, tokenSecret string, expiresIn time.Duration) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{
 		Issuer:    "chirpy",
-		IssuedAt:  jwt.NewNumericDate(time.Now()),
-		ExpiresAt: jwt.NewNumericDate(time.Now().Add(expiresIn)),
+		IssuedAt:  jwt.NewNumericDate(time.Now().UTC()),
+		ExpiresAt: jwt.NewNumericDate(time.Now().UTC().Add(expiresIn)),
 		Subject:   userID.String(),
 	})
 
@@ -37,7 +40,6 @@ func MakeJWT(userID uuid.UUID, tokenSecret string, expiresIn time.Duration) (str
 		return "", err
 	}
 
-	token.Signature = []byte(key)
 	return key, nil
 }
 
@@ -51,15 +53,25 @@ func ValidateJWT(tokenString, tokenSecret string) (uuid.UUID, error) {
 		return uuid.UUID{}, err
 	}
 
-	idString, err := token.Claims.GetSubject()
-	if err != nil {
+	claims, ok := token.Claims.(*jwt.RegisteredClaims)
+	if !ok {
 		return uuid.UUID{}, err
 	}
 
-	id, err := uuid.FromBytes([]byte(idString))
+	id, err := uuid.Parse(claims.Subject)
 	if err != nil {
 		return uuid.UUID{}, err
 	}
 
 	return id, nil
+}
+
+func GetBearerToken(headers http.Header) (string, error) {
+	authSlice, ok := headers["Authorization"]
+	if !ok {
+		return "", fmt.Errorf("no authorization found")
+	}
+
+	auth := strings.Fields(authSlice[0])[1]
+	return auth, nil
 }
