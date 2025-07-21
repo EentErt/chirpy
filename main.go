@@ -25,6 +25,7 @@ func main() {
 
 	ApiCfg.Platform = os.Getenv("PLATFORM")
 	ApiCfg.Secret = os.Getenv("SECRET")
+	ApiCfg.PolkaKey = os.Getenv("POLKA_KEY")
 
 	fmt.Println("hi")
 	ApiCfg.fileserverHits.Store(0)
@@ -45,6 +46,11 @@ func main() {
 	mux.HandleFunc("GET /api/chirps", getChirps)
 	mux.HandleFunc("GET /api/chirps/{chirpID}", getChirp)
 	mux.HandleFunc("POST /api/login", login)
+	mux.HandleFunc("POST /api/refresh", refresh)
+	mux.HandleFunc("POST /api/revoke", revoke)
+	mux.HandleFunc("PUT /api/users", updateUser)
+	mux.HandleFunc("DELETE /api/chirps/{chirpID}", deleteChirp)
+	mux.HandleFunc("POST /api/polka/webhooks", upgradeUser)
 
 	server.ListenAndServe()
 }

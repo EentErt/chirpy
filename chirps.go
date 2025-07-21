@@ -4,10 +4,10 @@ import (
 	"chirpy/internal/auth"
 	"chirpy/internal/database"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"slices"
+	"sort"
 	"strings"
 	"time"
 
@@ -69,13 +69,33 @@ func createChirp(writer http.ResponseWriter, request *http.Request) {
 }
 
 func getChirps(writer http.ResponseWriter, request *http.Request) {
-	chirps, err := ApiCfg.Queries.GetChirps(request.Context())
+	authorID := request.URL.Query().Get("author_id")
+	sortReq := request.URL.Query().Get("sort")
+	var chirps []database.Chirp
+	var err error
+
+	if authorID == "" {
+		chirps, err = ApiCfg.Queries.GetChirps(request.Context())
+	} else {
+		authorUUID, errParse := uuid.Parse(authorID)
+		if errParse != nil {
+			respondWithJsonError(writer, "Something went wrong", 500)
+			return
+		}
+
+		chirps, err = ApiCfg.Queries.GetChirpsByUser(request.Context(), authorUUID)
+	}
+
 	if err != nil {
-		errString := fmt.Sprint(err)
-		respondWithJsonError(writer, errString, 500)
+		respondWithJsonError(writer, "Something went wrong", 500)
 		return
 	}
 
+	if sortReq == "desc" {
+		sort.Slice(chirps, func(i, j int) bool {
+			return chirps[i].CreatedAt.After(chirps[j].CreatedAt)
+		})
+	}
 	respondWithJson(writer, 200, makeChirpsSlice(chirps))
 }
 
@@ -127,4 +147,47 @@ func makeChirpMap(chirp database.Chirp) map[string]string {
 	}
 
 	return chirpMap
+}
+
+func deleteChirp(writer http.ResponseWriter, request *http.Request) {
+	defer request.Body.Close()
+
+	// get the chirp id from the url
+	idString := request.PathValue("chirpID")
+	chirpID, err := uuid.Parse(idString)
+	if err != nil {
+		respondWithJsonError(writer, "Something went wrong", 500)
+		return
+	}
+
+	// get the token from the header
+	authorization, err := auth.GetBearerToken(request.Header)
+	if err != nil {
+		respondWithJsonError(writer, "Unauthorized", 401)
+		return
+	}
+
+	// verify the token
+	userID, err := auth.ValidateJWT(authorization, ApiCfg.Secret)
+	if err != nil {
+		respondWithJsonError(writer, "Unauthorized", 401)
+		return
+	}
+
+	// get the chirp
+	chirp, err := ApiCfg.Queries.GetChirp(request.Context(), chirpID)
+	if err != nil {
+		respondWithJsonError(writer, "Chirp not found", 404)
+		return
+	}
+
+	// check that the user is the author of the chirp
+	if chirp.UserID != userID {
+		respondWithJsonError(writer, "Forbidden", 403)
+		return
+	}
+
+	// delete the chirp
+	ApiCfg.Queries.DeleteChirp(request.Context(), chirpID)
+	respondWithJson(writer, 204, "Chirp deleted")
 }

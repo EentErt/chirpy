@@ -12,6 +12,7 @@ type apiConfig struct {
 	Queries        database.Queries
 	Platform       string
 	Secret         string
+	PolkaKey       string
 }
 
 var ApiCfg = apiConfig{

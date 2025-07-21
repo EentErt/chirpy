@@ -42,7 +42,7 @@ func TestMakeJWT(t *testing.T) {
 
 	for _, c := range cases {
 		testOut := testValidateOutput{}
-		testToken, _ := MakeJWT(c.input.id, c.input.secret, c.input.expiresIn)
+		testToken, _ := MakeJWT(c.input.id, c.input.secret)
 		_, err := ValidateJWT(testToken, c.input.secret)
 		testOut.err1 = err
 		time.Sleep(15 * time.Second)

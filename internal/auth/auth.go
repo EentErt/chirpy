@@ -1,10 +1,13 @@
 package auth
 
 import (
+	"encoding/hex"
 	"fmt"
 	"net/http"
 	"strings"
 	"time"
+
+	"crypto/rand"
 
 	"github.com/google/uuid"
 
@@ -27,11 +30,11 @@ func CheckPasswordHash(hashed_password, password string) error {
 	return nil
 }
 
-func MakeJWT(userID uuid.UUID, tokenSecret string, expiresIn time.Duration) (string, error) {
+func MakeJWT(userID uuid.UUID, tokenSecret string) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{
 		Issuer:    "chirpy",
 		IssuedAt:  jwt.NewNumericDate(time.Now().UTC()),
-		ExpiresAt: jwt.NewNumericDate(time.Now().UTC().Add(expiresIn)),
+		ExpiresAt: jwt.NewNumericDate(time.Now().UTC().Add(time.Duration(3600000000))),
 		Subject:   userID.String(),
 	})
 
@@ -73,5 +76,21 @@ func GetBearerToken(headers http.Header) (string, error) {
 	}
 
 	auth := strings.Fields(authSlice[0])[1]
+	return auth, nil
+}
+
+func MakeRefreshToken() (string, error) {
+	randBytes := make([]byte, 32)
+	rand.Read(randBytes)
+	return hex.EncodeToString(randBytes), nil
+}
+
+func GetApiKey(headers http.Header) (string, error) {
+	apiKey, ok := headers["Authorization"]
+	if !ok {
+		return "", fmt.Errorf("no api key found")
+	}
+
+	auth := strings.Fields(apiKey[0])[1]
 	return auth, nil
 }
